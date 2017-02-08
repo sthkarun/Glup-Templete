@@ -16,6 +16,7 @@ var inline_comment  = require('postcss-inline-comment');
 var lost            = require('lost');
 
 /** utils **/
+const imagemin = require('gulp-imagemin');
 var sourcemaps      = require('gulp-sourcemaps');
 var changed         = require('gulp-changed');
 var plumber         = require('gulp-plumber');
@@ -58,7 +59,7 @@ var src = {
 	fonts: basePath.src + 'fonts/',
 	img  : basePath.src + 'img/',
 	js   : basePath.src + 'js/',
-	libs : basePath.src + 'js/libs/',
+	plugins : basePath.src + 'js/plugins/',
 	css  : basePath.src + 'postcss/',
 	pages: basePath.src + 'twig/',
 	json : basePath.src + 'json/'
@@ -81,6 +82,12 @@ env({
  * sub tasks
  */
 
+gulp.task('clean', function() {
+	del(dest.css);
+	del('public/images');
+	del('public/*.html');
+});
+
 gulp.task('browser-sync', function() {
 	browserSync.init({
 		port: process.env.PORT,
@@ -96,15 +103,19 @@ gulp.task('browser-sync', function() {
 	gulp.watch(src.fonts + '**/*.svg', ['generate-icons']);
 	gulp.watch(src.pages + '**/*.twig', ['watch:pages']);
 	gulp.watch(src.js + '**/*.js', reload);
+	gulp.watch('src/images/*', function(event) {
+    gulp.run('image');
+  });
 });
 
 gulp.task('make:plugins', function() {
 	return gulp.src([
-		src.libs + 'jquery-2.1.4.min/*.js',
-		src.libs + '**/*.js'
+		src.plugins + '**/*.js',
+		src.js + 'global/*.js'
+
 	])
 	.pipe(concat('plugins.concat.js'))
-	.pipe(gulp.dest(src.js));
+	.pipe(gulp.dest('public/js'));
 });
 
 gulp.task('make:js', ['make:plugins'], function() {
@@ -126,7 +137,7 @@ gulp.task('make:js', ['make:plugins'], function() {
 gulp.task('watch:pages', ['make:pages'], reload);
 
 gulp.task('make:pages', function() {
-	return gulp.src(src.pages + '**/!(_)*.twig')
+	return gulp.src([src.pages + '**/!(_)*.twig', src.pages + '**/inc/!(_)*.twig'])
 		.pipe(plumber({
 			errorHandler: onError
 		}))
@@ -135,6 +146,13 @@ gulp.task('make:pages', function() {
 		}))
 		.pipe(gulp.dest(basePath.dest));
 });
+
+gulp.task('image', function() {
+    gulp.src('src/images/**')
+        .pipe(imagemin())
+        .pipe(gulp.dest('public/images'));
+});
+
 
 gulp.task('make:css', function() {
 	var plugins = [
@@ -165,19 +183,22 @@ gulp.task('minify', ['make:css', 'make:js', 'make:plugins'], function() {
 		.pipe(gulp.dest(dest.js))
 });
 
-gulp.task('generate-icons', function() {
+
+
+
+
+ gulp.task('generate-icons', function() {
 	var font_name = 'icon';
 	var file_name = 'icons';
-
 	return gulp.src(src.fonts + 'icons/*.svg')
 		.pipe(iconfont({
 			fontName: font_name,
+			prependUnicode: true,
 			appendUnicode: false,
 			normalize: true,
 			fontHeight: 1001
 		}))
 		.on('glyphs', function(glyphs, options) {
-
 			var font_options = function(value) {
 				var options = {
 					glyphs: glyphs,
@@ -188,17 +209,14 @@ gulp.task('generate-icons', function() {
 				value == 'demo' ? options.fontPath = '../' : options.fontPath = '../fonts/';
 				return options;
 			}
-
 			gulp.src(src.fonts + 'templates/template.css')
 				.pipe(consolidate('lodash', font_options('pub')))
-				.pipe(rename({ basename: '_' + file_name }))
+				.pipe(rename({ basename: '_' + file_name, extname: '.scss' }))
 				.pipe(gulp.dest(src.css + 'base/'));
-
 			gulp.src(src.fonts + 'templates/template.css')
 				.pipe(consolidate('lodash', font_options('demo')))
 				.pipe(rename({ basename: file_name }))
 				.pipe(gulp.dest(dest.fonts + '/template/'));
-
 			gulp.src(src.fonts + 'templates/template.html')
 				.pipe(consolidate('lodash', font_options))
 				.pipe(rename({
@@ -214,7 +232,7 @@ gulp.task('generate-icons', function() {
  */
 
 gulp.task('build', function() {
-	runSequence('generate-icons', ['make:css', 'make:plugins'], 'make:js', 'make:pages');
+	runSequence('generate-icons', ['clean', 'make:css', 'make:plugins'], 'make:js', 'make:pages', 'image');
 });
 
 gulp.task('default', ['browser-sync', 'make:pages']);
