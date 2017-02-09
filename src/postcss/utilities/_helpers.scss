@@ -9,6 +9,21 @@
 	}
 }
 
+%clearfix {
+	&:after {
+		display: block;
+		content: '';
+		display: block;
+	}
+}
+
+%listreset {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+
 /*text and image*/
 .ellipsis {
 	width: 100%;
